@@ -1,0 +1,5 @@
+{
+  "meta": {
+    "description": "DSH Web 移动端 UI 适配集大成插件：overlay 抽屉、安全区、canary 防升级失效；<=1023px 生效，桌面零影响。"
+  }
+}

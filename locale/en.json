@@ -1,0 +1,5 @@
+{
+  "meta": {
+    "description": "All-in-one mobile UI adaptation plugin for DSH Web: overlay drawer, safe areas, and a canary that guards against upgrade breakage; active at <=1023px, zero impact on desktop."
+  }
+}
