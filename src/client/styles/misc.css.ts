@@ -1,8 +1,10 @@
 /**
  * misc — M3：设置/弹层/目录选择器/内容流/第三方兼容。
  * 所有规则落在 @media (max-width: 1023px)；dshmarket 反制额外加 <=560px 子媒体。
- * 关键：设置对话框渲染在抽屉 DOM 内（VOzbGW_overlay 为 position:fixed），
+ * 关键（≤0.1.x）：设置对话框渲染在抽屉 DOM 内（VOzbGW_overlay 为 position:fixed），
  * 抽屉 transform 会成为其包含块 -> 打开设置时必须解除 transform 陷阱（:has）。
+ * 0.2.0 起设置对话框改为 body 级 portal（overlay>mask+panel），transform 陷阱消失，
+ * 但 [data-mobile-nav="frame"] 祖先作用域全部失效 -> 设置族规则改锚 .VOzbGW_panel。
  */
 
 const LINES = [
@@ -14,7 +16,9 @@ const LINES = [
   '  }',
   '',
   '  /* ---- 设置面板：桌面 800px 对话框 -> 移动端全屏纵向 ---- */',
-  '  [data-mobile-nav="frame"] .VOzbGW_panel {',
+  '  /* 0.2.0 起设置对话框 createPortal 到 document.body（overlay>panel），不再有 frame/drawer 祖先，',
+  '     故改锚 .VOzbGW_panel 哈希类（canary 已登记）；抽屉内 transform 陷阱规则仅对其余抽屉内弹层生效 ---- */',
+  '  .VOzbGW_panel {',
   '    width: 100vw !important;',
   '    max-width: 100vw !important;',
   '    height: 100dvh !important;',
@@ -22,10 +26,10 @@ const LINES = [
   '    border-radius: 0 !important;',
   '  }',
   '  /* nav 收成顶部横向可滚动按钮条（顺手修复宿主 flex-basis:0 压零宽 bug）*/',
-  '  [data-mobile-nav="frame"] [role="dialog"][aria-modal="true"]:has(> nav) {',
+  '  .VOzbGW_panel:has(> nav) {',
   '    flex-direction: column !important;',
   '  }',
-  '  [data-mobile-nav="frame"] [role="dialog"][aria-modal="true"]:has(> nav) > nav {',
+  '  .VOzbGW_panel:has(> nav) > nav {',
   '    flex: none !important;',
   '    flex-direction: row !important;',
   '    overflow-x: visible !important;',
@@ -36,11 +40,11 @@ const LINES = [
   '    align-items: center !important;',
   '  }',
   '  /* 页头标题（设置）不被 flex 压缩换行（div:not(:last-child)=标题；关闭按钮移入 nav 后为 button:first-child，不影响）*/',
-  '  [data-mobile-nav="frame"] [role="dialog"][aria-modal="true"]:has(> nav) > nav > div:not(:last-child) {',
+  '  .VOzbGW_panel:has(> nav) > nav > div:not(:last-child) {',
   '    flex: none !important;',
   '    white-space: nowrap !important;',
   '  }',
-  '  [data-mobile-nav="frame"] [role="dialog"][aria-modal="true"]:has(> nav) > nav > div:last-child {',
+  '  .VOzbGW_panel:has(> nav) > nav > div:last-child {',
   '    flex: 1 1 0 !important;',
   '    min-width: 0 !important;',
   '    flex-direction: row !important;',
@@ -49,25 +53,25 @@ const LINES = [
   '    overflow-x: auto !important;',
   '    scrollbar-width: thin;',
   '  }',
-  '  [data-mobile-nav="frame"] [role="dialog"][aria-modal="true"]:has(> nav) > nav button {',
+  '  .VOzbGW_panel:has(> nav) > nav button {',
   '    flex: 0 0 auto !important;',
   '    height: 36px !important;',
   '    padding: 6px 12px !important;',
   '    justify-content: center !important;',
   '  }',
   '  /* 移入 nav 的关闭按钮（nav 直系 button）豁免导航条样式：维持 28px 圆钮 + 无 padding */',
-  '  [data-mobile-nav="frame"] [role="dialog"][aria-modal="true"]:has(> nav) > nav > button {',
+  '  .VOzbGW_panel:has(> nav) > nav > button {',
   '    flex: 0 0 auto !important;',
   '    height: 28px !important;',
   '    width: 28px !important;',
   '    padding: 0 !important;',
   '  }',
-  '  [data-mobile-nav="frame"] [role="dialog"][aria-modal="true"]:has(> nav) > nav button > :last-child {',
+  '  .VOzbGW_panel:has(> nav) > nav button > :last-child {',
   '    flex: 0 1 auto !important;',
   '    min-width: 0 !important;',
   '  }',
   '  /* 内容区滚动 + 底部安全区 */',
-  '  [data-mobile-nav="frame"] [role="dialog"][aria-modal="true"]:has(> nav) > nav + div {',
+  '  .VOzbGW_panel:has(> nav) > nav + div {',
   '    flex: 1 1 0 !important;',
   '    min-height: 0 !important;',
   '    padding-bottom: env(safe-area-inset-bottom, 0px) !important;',

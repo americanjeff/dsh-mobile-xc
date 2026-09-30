@@ -12,7 +12,8 @@ import type { ReconcilerTask } from '../core/reconciler-core.ts'
 /** 打开配置文件按钮文本（zh/en；设置文档动作按钮，仅本地回环宿主存在）。 */
 const OPEN_DOC_RE = /^(\u6253\u5f00\u914d\u7f6e\u6587\u4ef6|Open configuration file)$/
 
-/** 求值状态钩子：设置对话框 = 含直系 nav 的 aria-modal 对话框（与 misc.css 锚一致）。 */
+/** 求值状态钩子：设置对话框 = 含直系 nav 的 aria-modal 对话框（0.2.0 起为 body 级 portal；
+ *  misc.css 设置族规则同集合，经 .VOzbGW_panel:has(> nav) 锚定）。 */
 function findSettingsDialog(): HTMLElement | null {
   if (typeof document === 'undefined') return null
   const dlg = document.querySelector('[role="dialog"][aria-modal="true"]')
