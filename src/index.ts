@@ -24,18 +24,28 @@ const ICON_SIZES = ['192', '512', '180'] as const
 export const XC_SETTINGS_NS = 'dsh-mobile-xc'
 
 /**
+ * 给字段挂 volatile 标记：运行时经 schemastery `.extra()` 写入 `meta.volatile = true`
+ *（3.18.1 源码实证：extra = 克隆 schema 后 `{ ...meta, [key]: value }`）；DSH >= 0.1.7 的
+ * 设置服务只把「含 volatile 字段」的 Config 投影为可配置命名空间，未标记则整个命名空间
+ * 不出现在 describe() 里。
+ * 类型侧：3.18.1 的 `extra()` 把 key 约束为 `keyof Meta`（Meta 无 volatile；`.volatile()`
+ * 方法 >= 3.18.4 才有，profile 内提升的是 3.18.1 不能用），故以一次结构断言绕开类型限制——
+ * 运行时行为与 `.volatile()` 写法完全一致（同为 meta.volatile=true）。
+ */
+function markVolatile<S>(schema: S): S {
+  return (schema as { extra(key: string, value: unknown): unknown }).extra('volatile', true) as S
+}
+
+/**
  * 移动端配置 schema：滑动开抽屉 / dshmarket 兼容修复 / PWA / 抽屉刷新按钮 / 页头横向滑动 / 轮次导航。
- * 字段标记 volatile（等价 schemastery >= 3.18.4 的 `.volatile()`，用 `.extra()` 写法以兼容
- * profile 内提升的 3.18.1）：DSH >= 0.1.7 的设置服务只把「含 volatile 字段」的 Config
- * 投影为可配置命名空间，未标记则整个命名空间不出现在 describe() 里。
  */
 export const XcSettings = z.object({
-  swipeEnabled: z.boolean().default(true).extra('volatile', true),
-  dshmarketNavFix: z.boolean().default(true).extra('volatile', true),
-  pwaEnabled: z.boolean().default(true).extra('volatile', true),
-  drawerRefresh: z.boolean().default(false).extra('volatile', true),
-  headerScroll: z.boolean().default(true).extra('volatile', true),
-  turnRail: z.boolean().default(true).extra('volatile', true),
+  swipeEnabled: markVolatile(z.boolean().default(true)),
+  dshmarketNavFix: markVolatile(z.boolean().default(true)),
+  pwaEnabled: markVolatile(z.boolean().default(true)),
+  drawerRefresh: markVolatile(z.boolean().default(false)),
+  headerScroll: markVolatile(z.boolean().default(true)),
+  turnRail: markVolatile(z.boolean().default(true)),
 })
 
 /**

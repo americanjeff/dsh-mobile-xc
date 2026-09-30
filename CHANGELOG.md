@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.7] - 2026-09-30
+
+### Fixed
+- **设置页移动端优化族规则重锚定（适配 DSH 0.2.0）**：0.2.0 起设置对话框改为
+  `createPortal(document.body)`（`overlay > mask + panel`），不再有
+  `[data-mobile-nav="frame"]` 祖先；原作用域在该锚下的设置族规则（面板全屏、nav 横滚条、
+  内容区滚动/安全区）集体失效，设置页回退为桌面双栏布局被挤进窄屏（左 188px 竖 nav +
+  右 ~150px 内容列逐字换行）。现改锚 canary 已登记的哈希类：
+  `.VOzbGW_panel` / `.VOzbGW_panel:has(> nav) …`；抽屉内 transform 陷阱规则保留，
+  仅对其余仍渲染在抽屉内的 aria-modal 弹层生效。selector-map 的 `.VOzbGW_panel`、
+  `.VOzbGW_nav` 两条登记 dshVersion 更新为 0.2.0-rc.2 并补 portal 变迁说明。
+  验证：CDP 探针（scripts/probe-settings-020.mjs）实测 390×844 下面板 390×844 全屏、
+  nav 52px 横条（navList 横向可滚）、内容区全宽纵向滚动，与 0.1.x 移动端设计一致；
+  桌面 ≥1024px 规则仍在 `@media (max-width:1023px)` 内，零影响。
+- **`pnpm verify` 门禁转绿**：`src/index.ts` 的 volatile 标记改经 `markVolatile()` 助手
+  （一次结构断言绕开 schemastery 3.18.1 `extra()` 的 `keyof Meta` 类型限制；运行时仍为
+  `meta.volatile=true`，与 `.volatile()`（>=3.18.4）行为一致）。此前 clean HEAD 上 tsc 即报
+  6 条 TS2345，与功能无关但挡住门禁。
+
 ## [0.6.6] - 2026-09-24
 
 ### Changed
