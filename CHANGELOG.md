@@ -5,6 +5,80 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.8] - 2026-10-24
+
+### Fixed
+- **移动端「页面可以一直往上滚、输入框不再固定在底部」（真机安全区溢出）**：
+  vendor 的 `.pI_x6G_frame` 是 `height:100%` + `box-sizing:content-box`，本插件又在同一元素上
+  加 `padding-top: env(safe-area-inset-top)` 给刘海让位。content-box 下 padding 不占高度额度，
+  帧总高 = 视口高 + inset（实测 iPhone 59px → 903px），撑破 `#root`（100dvh，overflow:visible），
+  于是**文档本身变成可纵向滚动**：手指上滑能把整页推上去（iOS 工具条随滚动收起 + html/body 的
+  100dvh 跟着变高，形成「页面无穷长」的观感）；同时贴在帧底的 composer 被顶到折叠线以下
+  （实测 seat 底边 903px > 视口 844px），输入框不再固定底部。
+  修复：给 `[data-mobile-nav="frame"]` 补 `box-sizing: border-box`，安全区内缩于 100% 之内，
+  文档高度恒等于视口。
+  验证：CDP 探针 `scripts/probe-mobile-page-scroll.mjs`（env() 无法用设备模拟器复现，故探针注入
+  `padding-top:59px` 模拟刘海机型）——修复前 5/10（frame 903px、文档可滚 59px、seat 底边 903px）。
+
+- **移动端「滑动一次页面就往上跑一点点」第二层：文档级禁滚（iPhone 14 Pro 真机实测）**：
+  上一条修好后，真机上整页仍能被一点点推走。真机诊断（临时注入的取数条）读数：
+  `html.h/body.h/root.h 全为 793、frame 793、seat.b 793` 全对，但
+  `document.scrollingElement.scrollHeight = 1189 > 793`（MAX 1265）——**帧本身没错，是文档的
+  可滚动区被撑大了**：`dsh-better-sidebar` 的 `[data-dsh-panel-host]`（fixed + inset:0 +
+  height:100vh）落在带 transform 的祖先下会退化成 abs 定位，把视口外的面板（`button.nArs4W_paneCard`
+  实测 t1177/b1233）算进文档溢出。手指滑到会话列表尽头后，滚动链继续传给文档，整页被推上去，
+  输入框随之飘到屏幕中间（这正是用户截图里「输入框悬空 + 下方大片空白」的形态）。
+  修复（双保险，与具体是哪个第三方元素无关）：
+  1. `html, body { overflow: hidden; overscroll-behavior: none }`——文档恒不可滚、无回弹；
+  2. `[data-phase] [class*="_scrollBody"] { overscroll-behavior-y: contain }`——会话内滑到尽头
+     不再把滚动链传给上层。
+  验证：探针扩充到 13 条并改用**真实触摸手势**（CDP `Input.synthesizeScrollGesture`；
+  注意 `overflow:hidden` 仍允许脚本 `scrollTo`，用 `scrollTo` 断言会误判）：注入一个
+  「视口下方 400px 的溢出物」后文档 scrollHeight 到 1444，触摸上滑 `scrollY` 仍为 0；
+  会话滑到尽头（sbTop 10649）再上滑，页面 `scrollY` 仍为 0。桌面 1440×900 零影响。
+
+- **移动端软键盘：composer 与键盘之间空隙过大 / 键盘收起后页面不回正（iPhone 14 Pro 真机）**：
+  iOS 不会因键盘弹起而缩小布局视口（`innerHeight` 与 `100dvh` 纹丝不动，键盘只是盖住下半屏），
+  composer 贴在帧底正好被盖住；WebKit 为露出光标自己把页面/视觉视口往上推一大截（推多少不由
+  我们控制 → 空隙过大），键盘收起后又**不把这笔滚动还回去**（→ 页面停在半空、下方一片空白）。
+  修复（新增 `src/client/effects/keyboard.ts` + 帧高变量）：
+  - 以 `visualViewport` 计算键盘占位，键盘在场时把 AppFrame 高度设为「可视区底边」
+    （`--dsh-xc-frame-h`，CSS 侧 `height: var(--dsh-xc-frame-h, 100%)`），composer 精确落在
+    键盘上沿，WebKit 不再需要自己推页面；
+  - 键盘期间强制 `scrollY = 0`，并在 `focusout` 后补两拍（250ms / 650ms）兜底还原，
+    解决「关掉键盘回不去」的残留滚动；
+  - 占位 < 80px（工具条收起这类几十像素变化）完全不动，交回原生 dvh；Android 的
+    `resizes-content` 场景下占位≈0，不会重复扣减。
+  验证：探针断言 CSS 契约——写入 `--dsh-xc-frame-h:457px` 后帧高=457、composer 底边=457，
+  移除变量后帧高回到视口高（无键盘时零介入）；真机行为需人工确认（CDP 无法模拟 iOS 键盘）。
+
+- **键盘弹起时间距仍偏大 / 加号指令面板太透明（真机反馈第二版）**：
+  - 间距：composer 根元素在移动端有 `padding-bottom: calc(8px + env(safe-area-inset-bottom))`，
+    键盘弹起后 home indicator 已被键盘盖住，这 34px 纯属浪费。改为键盘在场时
+    （`html[data-xc-kb="1"]`，由 `effects/keyboard.ts` 维护）把该内边距降回 8px，实测 42px → 8px。
+  - 透明：加号弹出的指令面板（`[role="listbox"]`）vendor 侧没有自己的背景，落在玻璃卡
+    （0.72 白 + blur）里，一打开就把底下的对话透上来，真机上几乎没法看。补一层不透明表面
+    （`var(--dsw-alias-bg-layer-1)`）+ 细边 + 阴影，深色主题跟随变量。
+  验证：探针改用 CDP `Emulation.setSafeAreaInsetsOverride` **真实注入 env() 安全区**
+  （Edge/Chrome 130+；比原先往元素上注 padding 更接近 iPhone 实况，不支持时降级为老做法），
+  断言：`env(safe-area-inset-top)=59px` 生效、键盘态 padding 42px→8px、
+  指令面板背景 alpha=1（`rgb(255,255,255)`）、无键盘时帧高零介入；合计 18/18 通过。
+
+- **点加号会弹出输入法（真机反馈，不合理）**：
+  vendor 在打开指令面板时会顺手 `focus()` composer 的书写区（桌面为了"接着打字过滤指令"很方便，
+  手机上就是平白弹键盘）；更关键的是**页面装载后就已把书写区聚焦**（iOS 上这种"无手势的聚焦"
+  不显键盘，却会在下一次任意点击时被手势激活 → 点加号时键盘立刻弹起）。
+  修复（`effects/focus-guard.ts`）：
+  - 把 composer 区域锚点从 `data-slot` 扩到 `[class*="uV2eYG_"]`——书写区 `.uV2eYG_input`
+    在 slot 之外，之前完全没被守卫覆盖，这是"守卫看着生效却照样弹键盘"的真正原因；
+  - 在 `HTMLElement.prototype.focus` 上按"是否本次手势点在书写区"放行/拦截程序化聚焦
+    （只靠 `focusin` 兜底有竞态：装载时就已聚焦时根本不会再触发 `focusin`）；
+  - 放行窗口收紧为**一次手势 1s**（否则点一次空白就长期放行）；
+  - 点 composer 内的按钮类控件（+、权限、模型、发送…）一律不放行；
+  - 装载时发现书写区已被 vendor 聚焦，立即 blur。
+  验证：探针改用**真实触摸**（`Input.dispatchTouchEvent`）——装载后 activeElement 为 BODY、
+  点加号后面板打开且 activeElement 仍为 BODY（不弹键盘）、再点输入框能正常聚焦（没把打字废掉）。
+
 ## [0.6.7] - 2026-09-30
 
 ### Fixed
